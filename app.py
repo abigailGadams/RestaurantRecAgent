@@ -4,6 +4,26 @@ import requests
 import urllib.parse
 import os
 from dotenv import load_dotenv
+from openai import OpenAI
+import time
+
+def refine_with_gpt(location, preferences, formatted_data):
+    for attempt in range(3):  # retry up to 3 times
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": f"Find restaurants in {location} that match: {preferences}.\n\nData:\n{formatted_data}"}
+                ]
+            )
+            return response.choices[0].message.content
+        except openai.RateLimitError as e:
+            print("Rate limit hit. Retrying in 10 seconds...")
+            time.sleep(10)
+        except openai.OpenAIError as e:
+            print(f"API Error: {e}")
+            break
 
 
 # Load environment variables
@@ -86,6 +106,7 @@ def format_yelp_results_with_google(businesses):
         formatted.append(item)
     return formatted
 
+client = OpenAI()
 
 def refine_with_gpt(location, preferences, raw_data):
     prompt = f"""
@@ -100,31 +121,14 @@ You are a luxury travel concierge. Based on the location "{location}" and the cl
 Raw Yelp Data:
 {raw_data}
 """
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4o",
         messages=[
             {"role": "system", "content": "You are a luxury restaurant recommender for high-end travel clients."},
             {"role": "user", "content": prompt}
         ]
     )
-    return response['choices'][0]['message']['content']
-
-def main():
-    print("🍽️ Luxury Restaurant Recommender 🍷")
-    location = input("Enter the client's destination (e.g., St. Tropez, Tokyo): ")
-    preferences = input("Enter client preferences (e.g., romantic, ocean view, seafood, vegan): ")
-
-    print("\n🔍 Searching Yelp for top restaurants...")
-    yelp_results = search_yelp(location, preferences)
-    
-
-    print("\n🧠 Refining results with GPT...\n")
-    refined_output = refine_with_gpt(location, preferences, formatted_data)
-    print(refined_output)
-
-if __name__ == "__main__":
-    main()
-
+    return response.choices[0].message.content
 
 # Streamlit App
 st.title("🍽️ Luxury Restaurant Recommender")
